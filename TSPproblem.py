@@ -45,4 +45,4 @@ class TSPProblem:
                 u,v,w = edge
                 vl.add(u)
                 vl.add(v)
-return vl
+        return vl
