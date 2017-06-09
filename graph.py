@@ -2,29 +2,31 @@ import multiprocessing
 import random
 import math
 from heapq import heappop, heappush
+from collections import defaultdict
 
 def flatten(L):
     while len(L) > 0:
         yield L[0]
         L = L[1]
 
+
 class Vertex:
-    def __init__(self, _id, _object):
+    def __init__(self, _id, **args):
         self._id = _id
-        self._value = _object
         self._outneighbors = {}
         self._inneighbors = {}
         self._label = dict()
         self._label['id'] = _id
-        self._label['value'] = _object
+        for a in args:
+            self._label[a] = args[a]
 
     @property
     def id(self):
         return self._id
 
     @property
-    def value(self):
-        return self._value
+    def label(self):
+        return self._label
 
     @property
     def neighbors(self):
@@ -34,46 +36,61 @@ class Vertex:
     def inneighbors(self):
         return self._inneighbors
     
-    @property
-    def label(self):
-        return self._label
-    
     def __str__(self):
         result = 'Vertex: ' + str(self.id) + '\n'
-        result += 'Value: ' + str(self._value) + '\n'
+        for l in self.label:
+            result += l +': ' + str(self.label[l]) + '\n'
         if len(self.neighbors)>0:
             result += 'Neighbors: OutDegree('+ str(len(self.neighbors)) + ')\n'
             for n in self.neighbors:
-                result += 'Vertex: ' + str(n) + ' weight: ' + str(self.neighbors[n])
+                result += 'Vertex: ' + str(n) + ' '
+                if isinstance(self.neighbors[n], dict):
+                    for w in self.neighbors[n]:
+                        result += w + ': ' + str(self.neighbors[n][w]) + ' '
+                else:
+                    result += 'value:' + self.neighbors[n]
                 result += '\n'
         else:
             result += 'No Neighbors \n'        
         if len(self.inneighbors)>0:
             result += 'In Neighbors: InDegree('+ str(len(self.inneighbors)) + ')\n'
             for n in self.inneighbors:
-                result += 'Vertex: ' + str(n) + ' weight: ' + str(self.inneighbors[n])
-                result += '\n'
+                result += 'Vertex: ' + str(n) + ' '
+                if isinstance(self.inneighbors[n], dict):
+                    for w in self.inneighbors[n]:
+                        result += w + ': ' + str(self.inneighbors[n][w]) + ' '
+                else:
+                    result += 'value:' + self.inneighbors[n]
+                result += '\n'                
         else:
             result += 'No in Neighbors \n'
         return result
 
-    def add_neighbor(self, _neighbor, _weight=1):
+    def add_neighbor(self, _neighbor, **args):
         if _neighbor not in self.neighbors.keys():
-            self.neighbors[_neighbor] = _weight
+            self.neighbors[_neighbor] = dict()
+        if len(args) > 0:
+            for a in args:
+                self.neighbors[_neighbor][a] = args[a]
+        else:
+            self.neighbors[_neighbor]['weight'] = 1
 
-    def add_inneighbor(self, _inneighbor, _weight=1):
+    def add_inneighbor(self, _inneighbor, **args):
         if _inneighbor not in self.inneighbors.keys():
-            self.inneighbors[_inneighbor] = _weight
-
+            self.inneighbors[_inneighbor] = dict()            
+        if len(args) > 0:
+            for a in args:
+                self.inneighbors[_inneighbor][a] = args[a]
+        else:
+            self.inneighbors[_inneighbor]['weight'] = 1
+            
 class Graph:
     def __init__(self, name, directed = False):
         self._vertices = dict()
         self._id = name
+        self._attr = dict()
         self._directed = directed
-        self._complete = None
-        self._tree = None
-        self.cyclic = None
-        self._connect = None
+        #self._attr['cyclic'] = None
     @property
     def vertices(self):
         return self._vertices
@@ -87,42 +104,42 @@ class Graph:
         return self._id
 
     @property
+    def directed(self):
+        return self._directed
+    
+    @property
     def complete(self):
-        if self._complete is None:
-            self._complete = self.iscomplete()
-        return self._complete
+        if 'complete' not in self._attr.keys():
+            self._attr['complete'] = self.iscomplete()
+        return self._attr['complete']
 
     @property
     def connected(self):
-        if self._connect is None:
-            self._connect = self.isconnected()
-        return self._connect
+        if 'connect' not in self._attr.keys():
+            self._attr['connect'] = self.isconnected()
+        return self._attr['connect']
+
+    @property
+    def tree(self):
+        if 'tree' not in self._attr.keys():
+            self._attr['tree'] = self.istree()
+        return self._attr['tree']
+    
     @property
     def density(self):
         n = self.cardinal
         return self.degreesum / (n * (n - 1.0))
-    @property
-    def tree(self):
-        if self._tree is None:
-            self._tree = self.istree()
-        return self._tree
+    
     @property
     def degreesum(self):
         return sum([len(self.vertices[v].neighbors) for v in self.vertices]) 
-    @property
-    def directed(self):
-        return self._directed
 
     def __getitem__(self, item):
         res = None
-        if isinstance(item, str):
+        if (isinstance(item, int) or isinstance(item, str)) and item in self._vertices.keys():
             res = self._vertices[item]
-            if res == None:
-                res = [j for i, j in enumerate(self._vertices) if j.id == item]
-        if isinstance(item, int):
-            res = self._vertices[item]
-        if isinstance(item, Vertex):
-            res = [j for i, j in enumerate(self._vertices) if j == item]
+        if isinstance(item, Vertex) and item in self._vertices.keys():
+            res = self._vertices[item.id]
         return res
 
     def __iter__(self):
@@ -130,36 +147,41 @@ class Graph:
         return res
 
     def __str__(self):
+        return self.to_string(sv=True, sa=True)
+    
+    def to_string(self, sv=False, sa=True):
         result = 'Graph: ' + str(self.id) + '\n'
         result += 'Number of vertices: ' + str(self.cardinal) + '\n'
         result += 'Number of edges: ' + str(self.getNumberEdges()) + '\n'
-        result += 'Directed: ' + str(self.directed) +'\n'
-        result += 'Connected: ' + str(self.connected) +'\n'
-        result += 'Complete: ' + str(self.complete) +'\n'
-        result += 'Tree: ' + str(self.tree) +'\n'
-        for v in (self._vertices):
-            result += str(self._vertices[v]) + '\n'
+        result += 'Densidad: ' + str(self.density) + '\n'
+        if sa:
+            self.connected
+            self.complete
+            self.tree
+        for a in self._attr:
+            result += a +': ' + str(self._attr[a]) + '\n'
+        if sv:
+            for v in (self._vertices):
+                result += str(self._vertices[v]) + '\n'
         return result
-
     def add_vertex(self, _vertex_obj):
         if isinstance(_vertex_obj, Vertex):
-            if _vertex_obj not in self._vertices and _vertex_obj.id not in self._vertices.keys():
+            if _vertex_obj.id not in self._vertices.keys():
                 self._vertices[_vertex_obj.id] = _vertex_obj
         return _vertex_obj
-
-    def add_edge(self, _begin, _end, _weight=1):
+    def add_edge(self, _begin, _end, **args):
 #        beg, end = None, None
         if isinstance(_begin, Vertex):
             if _begin.id in self.vertices.keys():
                 beg = self.vertices[_begin.id]
             else:
-                beg = _beg
+                beg = _begin
             self.add_vertex(beg)                
         else:
             if _begin in self._vertices.keys():
                 beg = self._vertices[_begin]
             else:
-                beg = Vertex(_begin, None)
+                beg = Vertex(_begin)
                 self.add_vertex(beg)
         if isinstance(_end, Vertex):
             if _end.id in self.vertices.keys():
@@ -171,56 +193,31 @@ class Graph:
             if _end in self._vertices.keys():
                 end = self._vertices[_end]
             else:
-                end = Vertex(_end, None)
+                end = Vertex(_end)
                 self.add_vertex(end)
 
         # print(beg.id, end.id, _weight)
         if not self.directed:
-            self.vertices[end.id].add_neighbor(beg.id, _weight)
-            self.vertices[beg.id].add_inneighbor(end.id, _weight)
-        self.vertices[beg.id].add_neighbor(end.id, _weight)
-        self.vertices[end.id].add_inneighbor(beg.id, _weight)
+            self.vertices[end.id].add_neighbor(beg.id, **args)
+            self.vertices[beg.id].add_inneighbor(end.id, **args)
+        self.vertices[beg.id].add_neighbor(end.id, **args)
+        self.vertices[end.id].add_inneighbor(beg.id, **args)
 #        print(beg.id, beg.inneighbors,end.id, end.inneighbors)
 
     def remove_vertex(self, v):
         if isinstance(v, Vertex):
-            rem = v
+            rem = self.vertices.pop(v.id)
         else:
             if v in self._vertices.keys():
-                rem = self._vertices[v]
+                rem = self.vertices.pop(v)
             else:
                 return None
-        result = Graph(self.id + ' -' + rem.id)
         for n in self._vertices:
-            if rem .id != self._vertices[n]:
-                a = Vertex(self._vertices[n].id, self._vertices[n].value)
-                for nn in self._vertices[n].neighbors:
-                    if nn != rem.id:
-                        a.add_neighbor(nn, self._vertices[n].neighbors[nn])
-                result.add_vertex(a)
-        return result
+            if rem.id != self._vertices[n]:
+                self._vertices[n].neighbors.pop(v.id)
+        return rem
 
-    def have_leafs(self):
-        result = False
-        for v in self._vertices:
-            if len(self._vertices[v].neighbors) == 0:
-                result = True
-                break
-        else:
-            result = False
-        return result
-
-    def adjacent_matrix(self):
-        result = {}
-        for v in self._vertices:
-            result[v] = {}
-            for n in self._vertices:
-                if n in self._vertices[v].neighbors:
-                    result[v][n] = self._vertices[v].neighbors[n]
-                else:
-                    result[v][n] = 0
-        return result
-
+    
     def getedges(self):
         result = dict()
         for v in self.vertices:
@@ -230,13 +227,22 @@ class Graph:
 
     def vertexcomplete(self, v):
         result = False
-        for n in self._vertices:
-            if v != n and n not in self._vertices[v].neighbors:
-                break
+        if not( len(self._vertices[v].neighbors)  == self.cardinal - 1 and v not in self._vertices[v].neighbors):
+            for n in self._vertices:
+                if v != n and n not in self._vertices[v].neighbors:
+                    break
+                else:
+                    result = True
         else:
-            result = True
+            result=True
         return result
 
+    def getNumberEdges(self):
+        edges = 0
+        for v in self.vertices:
+                edges+= len(self._vertices[v].neighbors)
+        return edges
+    
     def iscomplete(self):
         result = True
 #        for v in self.vertices:
@@ -247,8 +253,7 @@ class Graph:
             for v in self._vertices:
                 workers.append(pool.apply_async(func=Graph.vertexcomplete, args=(self, v,)))
             for w in workers:
-                result = result and w.get()
-                
+                result = result and w.get()                
         return result
 
     def istree(self):
@@ -264,15 +269,7 @@ class Graph:
             result = True
         return result
 
-    def iscyclic(self):
-        return False
 
-    def getNumberEdges(self):
-        edges = 0
-        for v in self.vertices:
-                edges+= len(self._vertices[v].neighbors)
-        return edges
-    
     def deepfirstsearch(self, v=None):
         if v is None: 
             lv = [x for x in self.vertices if len(self[x].inneighbors) == 0 and len(self[x].neighbors) > 0]
@@ -291,8 +288,8 @@ class Graph:
             av = p.pop()
             if av.id not in g:
                 g.append(av.id)
-            # print(av.id)
-               # print(av.neighbors.keys())
+                # print(av.id)
+                # print(av.neighbors.keys())
                 if len(av.neighbors) > 0:
                     ne = list(av.neighbors.keys())
                     random.shuffle(ne)
@@ -312,10 +309,10 @@ class Graph:
             else:
                 v = self[random.choice(list(self.vertices))]
         else:
-            if v is not Vertex:
-                v =self[v]
+            if type(v) is not  Vertex:
+                v =self.vertices[v]
             else:
-                v= self[v.id]
+                v= self.vertices[v.id]
         levels = {}
         levels[v.id] = 0
         sig = [v]
@@ -330,27 +327,34 @@ class Graph:
             sig = mark            
         return levels
 
-    def closenesscentrality(self, av):        
-        lvl = {}
-        bg = self.breadthfirstsearch(av)
-        #print(lvl)
-        #print(bg)
-        s = 0
-        for c in bg:
-            if bg[c] > 0:
-                s += 1/bg[c]
+    def closenesscentrality(self, av=None):
+        if type(av) is Vertex:
+            av = av.id
+        elif av is None:
+            r = defaultdict(int)
+            for v in self.vertices:
+                r[v]=self.closenesscentrality(v)
+        if av in self.vertices:
+            lvl = {}
+            bg = self.breadthfirstsearch(av)
+            #print(lvl)
+            #print(bg)
+            s = 0
+            for c in bg:
+                if bg[c] > 0:
+                    s += 1/bg[c]
+                else:
+                    s += 0
+            m = self.cardinal
+            #print(m,s)
+            if s <= 0:
+                r = math.inf
             else:
-                s += 0
-        m = self.cardinal
-        #print(m,s)
-        if s <= 0:
-            r = math.inf
-        else:
-            r = m/s        
+                r = m/s        
         return r
 
-        
-    def shortest(self, v, w): # Dijkstra's algorithm
+               
+    def shortest(self, v, w, key='weight'): # Dijkstra's algorithm
         if v is Vertex:
             v = v.id
         if w is Vertex:
@@ -363,30 +367,32 @@ class Graph:
                 visited.add(u)
                 if u == w:
                     return list(flatten(p))[::-1] + [u]
-            p = (u, p) 
+            p = (u, p)
             for n in self[u].neighbors:
                 if n not in visited:
-                    heappush(q, (l + 1, n, p))
+                    el = self.vertices[u].neighbors[n][key] if key in self.vertices[u].neighbors[n].keys() else 1
+                    heappush(q, (l + el, n, p))
         return None
     
-    def allshortedpaths(self):
+    def allshortedpaths(self, key= 'weight'):
         p = list()
         visited = []
         for v in self:
-            visited.append(v)
+            if not self.directed:
+                visited.append(v.id)
             for u in self:
-                if u not in visited:
-                    res = self.shortest(v, u)
+                if u.id not in visited:
+                    res = self.shortest(v.id, u.id, key)
                     if res is not None:
                         p.append(res)
         return p
 
-    def betweennesscentrality(self, v=None):
+    def betweennesscentrality(self, element=None, key='edge'):
         p = self.allshortedpaths()
         if element is None: # all vertex betweennesses
             b = defaultdict(int) # zero if no paths
             for v in self:
-                b[v] = sum([v in s for s in p])
+                b[v.id] = sum([v.id in s for s in p])
             return b
         elif element in self: # vertex betweenness
             return sum([element in s for s in p])
@@ -399,33 +405,76 @@ class Graph:
                         c += 1
             return c
 
-    def kruskal(self):
+    def kruskal(self, key='weight'):
         e = self.getedges()
         #for v in self.vertices:
         #    for n in self[v].neighbors:
         #        e[(v,n)] = self[v].neighbors[n]
-        arbol = Graph(self.id + ' MST from kuskal')
+        arbol = Graph(self.id + ' MST from kuskal', directed=True)
         peso = 0
         comp = dict()
         #print(e)
-        t = sorted(e.keys(), key = (lambda k: e[k]))        
+        t = sorted(e.keys(), key = lambda k: e[k][key], reverse=True)        
         #print(t)
-        comp = dict()
         nuevo = set()
         while len(t) > 0 and len(nuevo) < len(self.vertices):
             #print(len(t)) 
             arista = t.pop()
-            w = e[arista]    
+            w = e[arista][key]    
             del e[arista]
             (u,v) = arista
             c = comp.get(v, {v})
             if u not in c:
                 #print('u ',u, 'v ',v ,'c ', c)
-                arbol.add_edge(u,v,w)
+                arbol.add_edge(u,v,weight=w)
                 peso += w
                 nuevo = c.union(comp.get(u,{u}))
                 for i in nuevo:
                     comp[i]= nuevo
         print('MST con peso', peso, ':', nuevo)
         return arbol
-        
+
+    def findpath(self, v,w, path=[], capacity_key='capacity', flow_key='flow'):
+        if v is Vertex:
+            v = v.id
+        if w is Vertex:
+            w = w.id
+        if v==w:
+            return path
+        for n in self.vertices[v].neighbors:
+            if capacity_key not in self.vertices[v].neighbors[n].keys():
+                self.vertices[v].neighbors[n][capacity_key] = self.vertices[v].neighbors[n]['weight']
+            if capacity_key not in self.vertices[n].inneighbors[v].keys():
+                self.vertices[n].inneighbors[v][capacity_key] = self.vertices[n].inneighbors[v]['weight']
+                
+            if flow_key not in self.vertices[v].neighbors[n].keys():
+                self.vertices[v].neighbors[n][flow_key] = 0
+            if flow_key not in self.vertices[n].inneighbors[v].keys():
+                self.vertices[n].inneighbors[v][flow_key] = 0
+                
+            residual = self.vertices[v].neighbors[n][capacity_key] #- self.vertices[v].neighbors[n][flow_key]
+            if residual > 0 and not ((v,n), residual) in path:
+                result = self.findpath(n, w, path + [((v,n), residual)])
+                if result != None:
+                    return result
+                
+    def maxflow(self, s, t, capacity_key='capacity', flow_key='flow'):
+        result = 0
+        path = self.findpath(s,t,[])
+        while len(path) > 0:
+            flow = min(res for edge, res in path)
+            for edge, res in path:
+                u, v = edge
+                self.vertices[u].neighbors[v][flow_key] += flow
+                self.vertices[v].inneighbors[u][flow_key] += flow
+                
+                self.vertices[u].neighbors[v][capacity_key] -= flow
+                self.vertices[v].inneighbors[u][capacity_key] -= flow                
+            path = self.findpath(s,t,[])
+            if type(path) is type(None):
+                path =[]
+        for n in self.vertices[t].inneighbors:
+            if flow_key in self.vertices[t].inneighbors[n]:
+                result += self.vertices[t].inneighbors[n][flow_key]
+        return result
+

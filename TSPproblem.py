@@ -12,14 +12,14 @@ class TSPProblem:
     def graph(self):
         return self._graph
                 
-    def evaluate(self, path):
+    def evaluate(self, path, key ='weight'):
         valid = 0
         result = 0
         for edge in path:
             u,v = edge[0], edge[1]
             if u in self.graph.vertices.keys():
                 if v in self.graph[u].neighbors:
-                    result += self.graph[u].neighbors[v]
+                    result += self.graph[u].neighbors[v][key]
                 else:
                     result = None
                     break
@@ -28,10 +28,10 @@ class TSPProblem:
                 break            
         return result 
     
-    def costFunction(self, visitedlist, u, v):
+    def costFunction(self, visitedlist, u, v, key='weight'):
         result = None
         if v not in visitedlist and u in self.graph.keys() and v in self.graph[u].neighbors:
-            result  = self.graph[u].neighbors[v]
+            result  = self.graph[u].neighbors[v][key]
         return result
 
     def vertexpath(self, path):

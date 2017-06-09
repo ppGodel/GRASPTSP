@@ -20,7 +20,7 @@ def graspTSP(probgraph, iters, alpha):
         #print(so, ae, ls,be)
     return bs, bv, fi, sl
 
-def greedyconstructive(prob, alpha):
+def greedyconstructive(prob, alpha, key='weight'):
     path = []
     vl = list(prob.graph.vertices.keys())
     elem = random.choice(vl)
@@ -33,7 +33,7 @@ def greedyconstructive(prob, alpha):
         nl = list(set(prob.graph[elem].neighbors.keys()) - pl)
         if len(nl) == 0:
             break
-        wnl = [(x, prob.graph[elem].neighbors[x]) for x in nl ]
+        wnl = [(x, prob.graph[elem].neighbors[x][key]) for x in nl ]
         onl = sorted(wnl, key=lambda x:x[1])
         lim = round(alpha*len(onl)) if round(alpha*len(onl)) > 1 else 1
         rcl = onl[0:lim]
@@ -45,7 +45,7 @@ def greedyconstructive(prob, alpha):
         pl.add(ce[0])
         vl.remove(ce[0])
     if len(path) == (prob.graph.cardinal)-1:
-        path.append((elem, si, prob.graph[elem].neighbors[si]))
+        path.append((elem, si, prob.graph[elem].neighbors[si][key]))
     return path
     
 def localsearch(prob, so):
