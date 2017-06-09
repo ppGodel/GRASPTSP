@@ -30,7 +30,7 @@ class Distribution():
     @property
     def parameter2(self):
         return self._parameter2
-
+    
 class GraphInstancesGenerator():
     def __init__(self, graphtype, distribution_weight, distribution_degree, continuous_weight = False, directed = True):
         self.directed = directed

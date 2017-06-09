@@ -2,16 +2,21 @@ import graph
 import random
 import TSPproblem
 
-def graspTSP(probgraph, iters, alpha):
+def graspTSP(iters, alpha, probgraph =None, path =None, key='weight'):
+    
     sa = (None, 0)
     bs, bv = sa
-    tspp = TSPproblem.TSPProblem(graph = probgraph)
+    if probgraph is not None and path is None:
+        tspp = TSPproblem.TSPProblem(graph = probgraph)
+    else:
+        tspp = TSPproblem.TSPProblem(path=path)
+    
     sl = []
     print(tspp.graph)
     for i in range(iters):
-        so = greedyconstructive(tspp, alpha)
-        ls = localsearch(tspp,so)
-        av = tspp.evaluate(ls)
+        so = greedyconstructive(tspp, alpha, key)
+        ls = localsearch(tspp,so, key)
+        av = tspp.evaluate(ls, key)
         if bv < av:
             bs = ls
             bv = av
@@ -48,7 +53,7 @@ def greedyconstructive(prob, alpha, key='weight'):
         path.append((elem, si, prob.graph[elem].neighbors[si][key]))
     return path
     
-def localsearch(prob, so):
+def localsearch(prob, so, key='weight'):
     
     return so
 

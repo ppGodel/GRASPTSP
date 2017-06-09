@@ -1,12 +1,44 @@
+import graph
+import math
+def isfloat(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
 class TSPProblem:
-    def __init__(self, path = None, graph = None):
+    def __init__(self, path = None, p_graph = None):
         if path is not None:
             l = open(path,'r').readlines()
-            print(l)
-            p = l[0][-1]
-            self._problem = [(x.replace("\n", "").split(' ')) for x in l[1:]]
-        else:
-            self._graph = graph
+            #print(l)
+            cl = l[0].split(' ')
+            name = path.split('/')[-1].split('.')[0]
+            if cl[0].lower == 'name':
+                name = cl[2]
+            i=1
+            #print(name)
+            self._graph = graph.Graph(name, directed=False)
+            while l[i][0].isalpha():                    
+                i+=1
+            print('i',i)    
+            for vl in l[i:]:
+                il = vl.split(' ')
+                #and il[1].isdigit() and il[2].isdigit()
+                if len(il)>=3 and isfloat(il[1].replace('\n','')) and isfloat(il[2].replace('\n','')):
+                    v = graph.Vertex(il[0], coord=( float(il[1].replace('\n','')), float(il[2].replace('\n','')) ) )
+                    self._graph.add_vertex(v)
+
+            for v in self._graph.vertices:
+                #print(self._graph[v])
+                for n in self._graph.vertices:
+                    if v != n:
+                         x1, y1 = self._graph[v].label['coord']
+                         x2, y2 = self._graph[n].label['coord']
+                         #print(x1,y1,x2,y2)                         
+                         self._graph[v].add_neighbor(n, distance = math.sqrt( (x2-x1)**2 + (y2-y1)**2 ))
+        elif graph is not None:
+            self._graph = p_graph
 
     @property
     def graph(self):
